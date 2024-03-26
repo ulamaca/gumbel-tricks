@@ -16,12 +16,12 @@ if __name__ == '__main__':
     x1 = torch.randn(1, 2, requires_grad=True).to(device=device)
     x2 = torch.randn(1, 2, requires_grad=True).to(device=device)
 
-    v1 = torch.tensor([[100.0, 0.2]], dtype=torch.float32).to(device=device)
+    v1 = torch.tensor([[32.0, 0.2]], dtype=torch.float32).to(device=device)
     v2 = torch.tensor([[-25, 30]], dtype=torch.float32).to(device=device)
 
     # optimization
-    steps = 1000
-    learning_rate = 0.1
+    steps = 200
+    learning_rate = 1.0
     optimizer = torch.optim.Adam([x1, x2], lr=learning_rate)
 
     for step in range(steps):
@@ -29,14 +29,19 @@ if __name__ == '__main__':
         x2_ = gumbel_softmax(x2, tau=tau)
 
         loss = -(torch.mul(x1_, v1) + torch.mul(x2_, v2)).sum()
-        optimizer.zero_grad()  # Clear gradients
-        loss.backward()        # Compute gradients
-    
-        # Update parameters
+        
+        optimizer.zero_grad()  
+        loss.backward()                
         optimizer.step() 
 
         print(f"step#{step}: sum={-loss.item()}")
 
     
+    # inference
+    x1_ = gumbel_softmax(x1, hard=True)
+    x2_ = gumbel_softmax(x2, hard=True)
+    sum_ = -(torch.mul(x1_, v1) + torch.mul(x2_, v2)).sum().item()
+    print(f"the inferred result={-sum_}")
+    print(f'\t with x1={x1_}, x2={x2_}')
     
     breakpoint()
