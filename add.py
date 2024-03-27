@@ -23,13 +23,18 @@ if __name__ == '__main__':
     steps = 200
     learning_rate = 1.0
     optimizer = torch.optim.Adam([x1, x2], lr=learning_rate)
+    n_sample = 100
 
     for step in range(steps):
-        x1_ = gumbel_softmax(x1, tau=tau)
-        x2_ = gumbel_softmax(x2, tau=tau)
+        losses = []
+        for sample in range(n_sample):
+            x1_ = gumbel_softmax(x1, tau=tau)
+            x2_ = gumbel_softmax(x2, tau=tau)
 
-        loss = -(torch.mul(x1_, v1) + torch.mul(x2_, v2)).sum()
+            loss_s = -(torch.mul(x1_, v1) + torch.mul(x2_, v2)).sum()
+            losses.append(loss_s)
         
+        loss = sum(losses)/n_sample
         optimizer.zero_grad()  
         loss.backward()                
         optimizer.step() 
