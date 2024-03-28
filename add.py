@@ -39,7 +39,7 @@ if __name__ == '__main__':
         loss.backward()                
         optimizer.step() 
 
-        print(f"step#{step}: sum={-loss.item()}")
+        print(f"step#{step+1}: sum={-loss.item()}")
 
     
     # inference
