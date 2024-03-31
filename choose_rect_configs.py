@@ -1,10 +1,12 @@
 '''
-    test how gumbel help choose configs of rectanges so that the width becomes the maximal
+    test how gumbel help choose configs of rectanges so that the area/ (width&heigh) becomes the minimal
 '''
 
 import numpy as np
 import torch
 from torch.nn.functional import gumbel_softmax, relu
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 
 
 def torch_overlap_loss(X, W, gamma=10.0):
@@ -47,18 +49,39 @@ def torch_total_len_loss(X, W, which_dim=0, gamma=10.0):
 
     return soft_total_len
 
+def plot_results(X, W, names):
+    '''
+        by GPT-4, 3/31
+    '''
+    # Creating the plot again
+    fig, ax = plt.subplots()
+
+    # Adding rectangles to the plot again
+    for (x, y), (width, height), name in zip(X, W, names):
+        ax.add_patch(patches.Rectangle((x, y), width, height, edgecolor='black', facecolor='yellow', alpha=0.5))
+        ax.text(x, y, name, verticalalignment='bottom', horizontalalignment='left')
+
+    # Correcting the calculation for the limits of the plot
+    ax.set_xlim(0, max([x + width for (x, _), (width, _) in zip(X, W)]) + 1)
+    ax.set_ylim(0, max([y + height for (_, y), (_, height) in zip(X, W)]) + 1)
+
+    plt.show()
+
+## HYPERPARAMS
 device = 'cpu'
 N = 10
 Nc = 20 # num. of config candidates
 tau = 5.0
-steps = 500
-learning_rate = 5.0
-which_dim = 0 # w or h to minimize (0=w, 1=h)
+steps = 2000
+learning_rate = 1.0
+which_wh = 0 # w or h to minimize (0=w, 1=h)
+seed = 42
+shape_control = 'area' # or 'wh'
+##
 
-# TODO
-# plot of the results
 
-# init
+## init
+np.random.seed(seed)
 config_W = np.random.randint(low=1, high=21, size=(Nc, 2))
 X0 = 30.0*np.random.randn(N, 2) + 50.0
 
@@ -66,6 +89,7 @@ if __name__ == "__main__":
     '''
         _t for tensor
     '''
+    torch.manual_seed(seed)   
     s_t = torch.randn(N, Nc, requires_grad=True).to(device=device) # variable to optimize
     X = torch.from_numpy(X0).requires_grad_(True).to(device=device)
 
@@ -82,18 +106,30 @@ if __name__ == "__main__":
 
         loss_o = torch_overlap_loss(X, W)
         loss_o = torch.tril(loss_o, diagonal=-1).sum()
-        loss_l = torch_total_len_loss(X, W, which_dim=which_dim)
+        loss_w = torch_total_len_loss(X, W, which_dim=0)
+        loss_h = torch_total_len_loss(X, W, which_dim=1)
 
-        loss = 10.0*loss_o + 5.0*loss_l
+        if shape_control == 'area':        
+            loss = 100.0*loss_o + 5.0*loss_w*loss_h
+        elif shape_control == 'wh':
+            loss = 10.0*loss_o + 5.0*loss_w + 5.0*loss_h
+        else:
+            raise ValueError
 
         optimizer.zero_grad()  
         loss.backward()                
         optimizer.step() 
 
-        print(f"step#{i}: total_len={loss_l.item()}, ideal_len={config_W[:, which_dim].min()*N}")
-        print(f"step#{i}: overlap={loss_o.item()}")
+        print(f"step#{i}: total_w={loss_w.item()}, total_h={loss_h.item()}, overlap={loss_o.item()}")        
 
-    print("selected WH")
+    # get the final results and plot it
+    X_ = X.detach().numpy()
     g_sel_t_hard = gumbel_softmax(s_t, dim=1, hard=True)
-    print(torch.matmul(g_sel_t_hard, config_W_t) )
-    breakpoint()
+    W_t = torch.matmul(g_sel_t_hard, config_W_t) 
+    W_ = W_t.detach().numpy()
+    
+    names = [f'rect-{i+1}' for i in range(X_.shape[0])]
+
+    plot_results(X_, W_, names)
+    print("check the possible config_Ws and the selection results:")
+    print(config_W, g_sel_t_hard.detach().numpy())
