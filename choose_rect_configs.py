@@ -62,13 +62,20 @@ def plot_results(X, W, names):
         ax.text(x, y, name, verticalalignment='bottom', horizontalalignment='left')
 
     # Correcting the calculation for the limits of the plot
-    ax.set_xlim(0, max([x + width for (x, _), (width, _) in zip(X, W)]) + 1)
-    ax.set_ylim(0, max([y + height for (_, y), (_, height) in zip(X, W)]) + 1)
+    offset = 1
+    ax.set_xlim(X[:,0].min()-offset, max([x + width for (x, _), (width, _) in zip(X, W)]) + offset)
+    ax.set_ylim(X[:,1].min()-offset, max([y + height for (_, y), (_, height) in zip(X, W)]) + offset)
 
     plt.show()
 
 ## HYPERPARAMS
-device = 'cpu'
+# use GPU when available when use_gpu tag is on, otherwise always use CPU (it is faster for my laptop :)
+use_gpu = False
+if use_gpu:
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+else:
+    device = 'cpu'
+
 N = 10
 Nc = 20 # num. of config candidates
 tau = 5.0
@@ -77,6 +84,8 @@ learning_rate = 1.0
 which_wh = 0 # w or h to minimize (0=w, 1=h)
 seed = 42
 shape_control = 'area' # or 'wh'
+anneal_rate = 0.99
+min_tau = 0.05
 ##
 
 
@@ -90,13 +99,17 @@ if __name__ == "__main__":
         _t for tensor
     '''
     torch.manual_seed(seed)   
-    s_t = torch.randn(N, Nc, requires_grad=True).to(device=device) # variable to optimize
-    X = torch.from_numpy(X0).requires_grad_(True).to(device=device)
+    s_t = torch.randn(N, Nc).to(device=device).requires_grad_(True) # variable to optimize
+    X = torch.from_numpy(X0).to(device=device).requires_grad_(True)
 
     optimizer = torch.optim.Adam([X, s_t], lr=learning_rate)
     
+    print(f"using device = {device}")
+    print("the optimization starts:")
+    tau_i = tau # the init tau
     for i in range(steps):
-        g_sel_t = gumbel_softmax(s_t, dim=1, tau=5.0) # gumbel selector
+        tau_i = max(tau_i * anneal_rate, min_tau)
+        g_sel_t = gumbel_softmax(s_t, dim=1, tau=5.0, hard=True) # gumbel selector
         #g_sel_t_hard = gumbel_softmax(s_t, dim=1, hard=True)
         
         config_W_t = torch.from_numpy(config_W).float().to(device=device)
@@ -123,13 +136,13 @@ if __name__ == "__main__":
         print(f"step#{i}: total_w={loss_w.item()}, total_h={loss_h.item()}, overlap={loss_o.item()}")        
 
     # get the final results and plot it
-    X_ = X.detach().numpy()
+    X_ = X.detach().cpu().numpy()
     g_sel_t_hard = gumbel_softmax(s_t, dim=1, hard=True)
     W_t = torch.matmul(g_sel_t_hard, config_W_t) 
-    W_ = W_t.detach().numpy()
+    W_ = W_t.detach().cpu().numpy()
     
     names = [f'rect-{i+1}' for i in range(X_.shape[0])]
 
     plot_results(X_, W_, names)
     print("check the possible config_Ws and the selection results:")
-    print(config_W, g_sel_t_hard.detach().numpy())
+    print(config_W, g_sel_t_hard.detach().cpu().numpy())
