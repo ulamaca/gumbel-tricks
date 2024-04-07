@@ -3,7 +3,11 @@
         guess
             tau > control the sample fromat (more onehot or more uniform vec)
             noise > control certainty of samples
-
+        
+            20240407 Update: the distinction may not be needed since one can resort to ST (straight-through) trick to direct
+                            optimize the only-one-choice sample by the clever (y_hard-y_soft).detach() + y_soft
+                            I was not aware of it and had some misunderstanding. 
+                            But the tau/noise trade-off might have some usecase in the future (?)
 
     plot
         scatter: x is the dim of the vector, y sampled values of the tensors
