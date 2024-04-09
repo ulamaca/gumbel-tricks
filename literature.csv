@@ -1,0 +1,5 @@
+name;year;authors;codebase
+Learning with and for discrete optimization;2023;Max B. Paulus;N/A
+Rao-Blackwellizing the Straight-Through Gumbel-Softmax Gradient Estimator;2021;"Max B. Paulus, Chris J. Maddison, Andreas Krause";N/A
+A Review of the Gumbel-max Trick and its Extensions for Discrete Stochasticity in Machine Learning;2021;Iris A. M. Huijben, Wouter Kool, Max B. Paulus, Ruud J. G. van Sloun;N/A
+Gumbel-softmax-based optimization: a simple general framework for optimization problems on graphs;2021;Yaoxin Li, Jing Liu, Guozheng Lin, Yueyuan Hou, Muyun Mou & Jiang Zhang;N/A
