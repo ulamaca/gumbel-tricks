@@ -1,5 +1,10 @@
 '''
     test how gumbel help choose configs of rectanges so that the area/ (width&heigh) becomes the minimal
+    + 1 visualize learning dynamics of Gumbel variables
+        > observation-1: the selector converges at the beginning (fast converge to suboptimal!?)
+        > observation-2: the tau won't influence the fast convergence property!
+            >> TODO: to look at the effect of sampling, use multiple sample at each step for computing loss and do gradient descent
+        > TODO: may visualize with plots
 '''
 
 import numpy as np
@@ -7,6 +12,7 @@ import torch
 from torch.nn.functional import gumbel_softmax, relu
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+from torch.distributions import Categorical
 
 
 def torch_overlap_loss(X, W, gamma=10.0):
@@ -77,8 +83,8 @@ else:
     device = 'cpu'
 
 N = 10
-Nc = 20 # num. of config candidates
-tau = 5.0
+Nc = 50 # num. of config candidates
+tau = 1e6
 steps = 2000
 learning_rate = 1.0
 which_wh = 0 # w or h to minimize (0=w, 1=h)
@@ -86,6 +92,8 @@ seed = 42
 shape_control = 'area' # or 'wh'
 anneal_rate = 0.99
 min_tau = 0.05
+normalize_logits = False
+show_dynamics = True
 ##
 
 
@@ -107,10 +115,26 @@ if __name__ == "__main__":
     print(f"using device = {device}")
     print("the optimization starts:")
     tau_i = tau # the init tau
+    
+    decision_trace = {}
+    entropy_sel_trace = {}
+    loss_trace = {}
+
     for i in range(steps):
         tau_i = max(tau_i * anneal_rate, min_tau)
+        if normalize_logits:
+            s_t = s_t / s_t.sum(dim=1)
+            breakpoint()
         g_sel_t = gumbel_softmax(s_t, dim=1, tau=5.0, hard=True) # gumbel selector
-        #g_sel_t_hard = gumbel_softmax(s_t, dim=1, hard=True)
+        
+        if i% 100 ==0:
+            tmp = s_t.detach()
+            decision_trace[i] = tmp.argmax(dim=1).numpy()
+            p_t = tmp.exp()/tmp.exp().sum(dim=1).reshape(-1,1)      
+
+            # two ways to observe entropy      
+            #entropy_sel_trace[i] = [Categorical(p_t[i,:]).entropy().item() for i in range(p_t.shape[0])]            
+            entropy_sel_trace[i] = p_t.max(dim=1)[0] - p_t.min(dim=1)[0]
         
         config_W_t = torch.from_numpy(config_W).float().to(device=device)
 
@@ -133,6 +157,7 @@ if __name__ == "__main__":
         loss.backward()                
         optimizer.step() 
 
+        loss_trace[i] = loss_w.item() * loss_h.item()
         print(f"step#{i}: total_w={loss_w.item()}, total_h={loss_h.item()}, overlap={loss_o.item()}")        
 
     # get the final results and plot it
@@ -143,6 +168,15 @@ if __name__ == "__main__":
     
     names = [f'rect-{i+1}' for i in range(X_.shape[0])]
 
+    breakpoint()
     plot_results(X_, W_, names)
     print("check the possible config_Ws and the selection results:")
     print(config_W, g_sel_t_hard.detach().cpu().numpy())
+
+    if show_dynamics:
+        print('dynamics:')
+        for step, entropy in entropy_sel_trace.items():
+            print(f"entropy@step={step}: ", entropy)
+        
+        for step, dec in decision_trace.items():
+            print(f"decision@step={step}: ", dec)
