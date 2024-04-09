@@ -4,6 +4,7 @@
         > observation-1: the selector converges at the beginning (fast converge to suboptimal!?)
         > observation-2: the tau won't influence the fast convergence property!
             >> TODO: to look at the effect of sampling, use multiple sample at each step for computing loss and do gradient descent
+        > observation-3: if turn on normalize_logits, it will produce weird dynamics, not making sense! (TODO: to understand that)
         > TODO: may visualize with plots
 '''
 
@@ -123,8 +124,8 @@ if __name__ == "__main__":
     for i in range(steps):
         tau_i = max(tau_i * anneal_rate, min_tau)
         if normalize_logits:
-            s_t = s_t / s_t.sum(dim=1)
-            breakpoint()
+            s_t = torch.nn.Softmax(dim=1)(s_t)            
+            
         g_sel_t = gumbel_softmax(s_t, dim=1, tau=5.0, hard=True) # gumbel selector
         
         if i% 100 ==0:
@@ -154,7 +155,7 @@ if __name__ == "__main__":
             raise ValueError
 
         optimizer.zero_grad()  
-        loss.backward()                
+        loss.backward(retain_graph=True)                
         optimizer.step() 
 
         loss_trace[i] = loss_w.item() * loss_h.item()
