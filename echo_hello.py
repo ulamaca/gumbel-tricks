@@ -2,6 +2,11 @@
     Apply Gumble Straight-Through training a model, able to learn to say hello!
     +1 v1: just learn to say something from characters of H,E,L,O
     +2 v2: can say HELLO exactly
+    +3 v3: added option for using log_gumbel_softmax
+        > TODO: think about it why? log_softmax, if set eps smaller, it will make the gradient value larger 
+    +4 added noise-adding support: TODO, I want to make the learning explore properly, how to get this done as I want 
+
+    0415, observing the gradients during leraning at the pre-gumbel logit layer    
 
 '''
 
@@ -71,6 +76,12 @@ def count_hello(output):
     
     return sum(losses)
 
+## hooks
+def print_logit_grad_hook(module, grad_input, grad_output):
+    print("the mean grad value over a mini-batch")
+    print(grad_output[0].mean(dim=0))    
+    print("---")
+
 if __name__ == "__main__":
     # hperparams
     latent_dim = 16
@@ -82,10 +93,17 @@ if __name__ == "__main__":
     n_inference = 50         
     loss_types = ['a', 'helo-char', 'hello']
     loss_type = loss_types[2]
+    show_grad = True
+    add_noise = True
+    noise_level = 100.0
+    log_softmax = False
+    log_softmax_eps = 1e-1
 
     # model setup
     model = CharMLP(latent_dim)
     optimizer = optim.Adam(model.parameters(), lr=lr)
+    if show_grad:
+        model.register_backward_hook(print_logit_grad_hook)
 
 
     # training loop
@@ -99,8 +117,18 @@ if __name__ == "__main__":
         if step % 10 == 0 and step > 0:
             tau_step = tau_step* anneal_rate
         
+        if add_noise:
+            # noise will be at the 'noise_level' of logits' exact value
+            noise = logits.max(dim=2, keepdim=True)[0] * noise_level * torch.randn_like(logits)
+            logits = logits + noise
+            
         # Convert logits to probabilities
         one_hot_samples = gumbel_softmax(logits, tau=tau_step, hard=True, dim=-1) # over the dimension of characters
+        if log_softmax:
+            one_hot_samples = torch.log(one_hot_samples+log_softmax_eps)
+        
+        
+
 
         # optimize
         if loss_type == 'a':
