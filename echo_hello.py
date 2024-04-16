@@ -7,6 +7,10 @@
     +4 added noise-adding support: TODO, I want to make the learning explore properly, how to get this done as I want 
 
     0415, observing the gradients during leraning at the pre-gumbel logit layer    
+    0416, observations: 
+        (1) no matter hard/soft gumbel, the grad patterns are similar; (2) tau affects the scale of grad but not the pattern
+        it might be due to the nature of the loss, one direction is to go for a more explorative problem
+
 
 '''
 
@@ -87,14 +91,14 @@ if __name__ == "__main__":
     latent_dim = 16
     anneal_rate = 0.95
     lr = 0.001
-    steps = 100
+    steps = 10
     batch_size = 5
-    tau = 100.0
+    tau = 10000.0
     n_inference = 50         
     loss_types = ['a', 'helo-char', 'hello']
     loss_type = loss_types[2]
     show_grad = True
-    add_noise = True
+    add_noise = False
     noise_level = 100.0
     log_softmax = False
     log_softmax_eps = 1e-1
@@ -122,7 +126,7 @@ if __name__ == "__main__":
             noise = logits.max(dim=2, keepdim=True)[0] * noise_level * torch.randn_like(logits)
             logits = logits + noise
             
-        # Convert logits to probabilities
+        # Convert logits to probabilities        
         one_hot_samples = gumbel_softmax(logits, tau=tau_step, hard=True, dim=-1) # over the dimension of characters
         if log_softmax:
             one_hot_samples = torch.log(one_hot_samples+log_softmax_eps)
